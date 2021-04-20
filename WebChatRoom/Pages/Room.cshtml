@@ -1,0 +1,234 @@
+﻿@page
+@model RoomModel
+<div class="container">
+    <div class="row">&nbsp;</div>
+    <div class="row">
+        <div class="col-8">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h1>Room: @Model.Room.Name</h1>
+                </div>
+                <table class="table table-bordered text-center" id="table" style="visibility: hidden;">
+                    <tbody>
+                        @for (int i = 0; i < 3; i++)
+                        {
+                            <tr class="d-flex bd-highlight">
+                                @for (int j = 0; j < 3; j++)
+                                {
+                                    <td class="flex-fill bd-highlight"><button class="btn btn-primary" id="@(i*3+j)" disabled onclick="cl(this.id)">_</button></td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="scroll card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <ul id="messagesList"></ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="row" id="typingIndicator" style="display: none">
+                        <div class="col">
+                            <p id="indicatorText" style="display: inline"></p>
+                            <img src="../media/transgif.gif" alt="typing indicator" width="40" height="20" style="display: inline">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-2">Message</div>
+                        <div class="col-6"><input onkeyup="indicateIsTyping()" class="col-12" type="text" id="messageInput" /></div>
+                        <div class="col-4">
+                            <input type="button" id="sendButton" value="Send Message" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h1>Participants </h1>
+                </div>
+                <div class="card-body">
+                    <ul id="Participants">
+                        @foreach (var participant in Model.Room.Participants)
+                        {
+                            <li>@participant.Name</li>
+                         }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<input type="hidden" id="roomid" name="roomid" value="@Model.Room.Id" />
+<input type="hidden" name="participantId" value="@Model.Participant.Id" />
+<input type="hidden" id="ParticipantsCount" name="ParticipantsCount" value="@Model.Room.Participants.Count" />
+<input type="hidden" id="participantName" name="participantName" value="@Model.Participant.Name" />
+<input type="hidden" id="turn" name="turn" value="false" />
+
+<script src="~/js/signalr/dist/browser/signalr.js"></script>
+
+<script>
+    "use strict";
+
+    var connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+
+    if (document.getElementById("ParticipantsCount").value > 1) {
+        document.getElementById("table").style.visibility = "visible";
+    }
+    
+    function turn(name) {
+        if (document.getElementById("participantName").value == name) {
+            document.getElementById("turn").value = "false";
+        } else {
+            document.getElementById("turn").value = "true";
+        }
+        WhoWin();
+        if (document.getElementById("turn").value == "true") {
+            for (var i = 0; i < 9; i++) {
+                if (document.getElementById(i).innerHTML == "_") {
+                    document.getElementById(i).removeAttribute("disabled");
+                }
+            }
+        } else {
+            for (var i = 0; i < 9; i++) {
+                document.getElementById(i).setAttribute("disabled", "disabled");
+            }
+        }
+    }
+    
+    function WhoWin() {
+        var m = 
+            [
+                [, , ],
+                [, , ],
+                [, , ]
+            ];
+        for(var i = 0; i < 3; i++) {
+            for (var j = 0; j < 3; j++) {
+                m[i][j] = document.getElementById(i * 3 + j).innerHTML;
+                
+            }
+        }
+        var userWin = "_";
+        for (var i = 0; i < 3; i++)
+        {
+            if (m[0][i] != "_" && m[i][0] == m[i][1] && m[i][1] == m[i][2]) userWin = m[i][2];
+            if (m[0][i] != "_" && m[0][i] == m[1][i] && m[1][i] == m[2][i]) userWin = m[0][i];
+        }
+
+        if (m[0][0] != "_" && m[0][0] == m[1][1] && m[1][1] == m[2][2]) userWin = m[2][2];
+        if (m[0][2] != "_" && m[0][2] == m[1][1] && m[1][1] == m[2][0]) userWin = m[2][0];
+
+        if (userWin != "_") {
+            alert(userWin);
+            window.location.href = '/';
+        }
+    }
+    //Disable send button until connection is established
+    document.getElementById("sendButton").disabled = true;
+    
+    connection.on("ReceiveMessage", function (user, message) {
+        var msg = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        var encodedMsg = user + " says " + msg;
+        var li = document.createElement("li");
+        li.textContent = encodedMsg;
+        document.getElementById("messagesList").appendChild(li);
+    });
+
+    connection.on("Clicking", function (user, id)
+    {
+        if (user == "FirstPlayer") {
+            document.getElementById(id).innerHTML = "x";
+        } else {
+            document.getElementById(id).innerHTML = "o";
+        }
+        turn(user);
+    });
+
+    connection.on("RoomUpdate", function (user) {
+        document.getElementById("turn").value = "true";
+        var p = document.createElement("li");
+        p.textContent = "SecondPlayer";
+        turn();
+        document.getElementById("Participants").appendChild(p);
+        document.getElementById("table").style.visibility = "visible";
+    });
+
+
+    function setIndicatorOff() {
+        document.getElementById("typingIndicator").style.display = "none";
+    }
+
+    connection.on("Typing", function (user) {
+        document.getElementById("indicatorText").innerHTML = user + " is typing";
+        document.getElementById("typingIndicator").style.display = "block";
+        setTimeout(setIndicatorOff, 2000);
+    });
+
+    connection.start().then(function () {
+        document.getElementById("sendButton").disabled = false;
+        var roomID = document.getElementById("roomid").value;
+        var ParticipantsCount = document.getElementById("ParticipantsCount").value;
+        
+        if (ParticipantsCount > 1)
+        {
+            var user = document.getElementById("participantName").value;
+            connection.invoke("UpdateRoom", roomID, user).catch(function (err) {
+                return console.error(err.toString());
+            });
+        }
+        connection.invoke("JoinRoom", roomID);
+    }).catch(function (err) {
+        return console.error(err.toString());
+    });
+
+    document.getElementById("sendButton").addEventListener("click", function (event) {
+        var roomID = document.getElementById("roomid").value;
+        var user = document.getElementById("participantName").value;
+        var message = document.getElementById("messageInput").value;
+        connection.invoke("SendMessage", roomID, user, message).catch(function (err) {
+            return console.error(err.toString());
+        });
+        event.preventDefault();
+    });
+
+    var timerIsRunning = false;
+
+    function setTimerRunningFalse() {
+        timerIsRunning = false;
+    }
+
+    function indicateIsTyping() {
+        if (timerIsRunning) {
+            return;
+        }
+        timerIsRunning = true;
+        var roomID = document.getElementById("roomid").value;
+        var user = document.getElementById("participantName").value;
+        connection.invoke("ParticipantTyping", roomID, user).catch(function (err) {
+            return console.error(err.toString());
+        });
+        setTimeout(setTimerRunningFalse, 2000);
+    }
+
+    function cl(id) {
+        var roomID = document.getElementById("roomid").value;
+        var user = document.getElementById("participantName").value;
+        connection.invoke("Change", roomID, user, id).catch(function (err) {
+            return console.error(err.toString());
+        });
+    }
+</script>
+
+
+
+
+
+
