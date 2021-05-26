@@ -119,7 +119,7 @@
         var userWin = "_";
         for (var i = 0; i < 3; i++)
         {
-            if (m[0][i] != "_" && m[i][0] == m[i][1] && m[i][1] == m[i][2]) userWin = m[i][2];
+            if (m[i][0] != "_" && m[i][0] == m[i][1] && m[i][1] == m[i][2]) userWin = m[i][0];
             if (m[0][i] != "_" && m[0][i] == m[1][i] && m[1][i] == m[2][i]) userWin = m[0][i];
         }
 
